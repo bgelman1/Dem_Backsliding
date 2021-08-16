@@ -1,0 +1,414 @@
+---
+title: "automated graphs"
+output: html_document
+---
+
+
+#This script automates graph creation for the 4 different lists studied in the backsliding article
+```{r setup, include=FALSE}
+#set up libraries
+library(waffle)
+library(ggthemes)
+library(ggplot2)
+library(tidyverse)
+library(kableExtra)
+library(readxl)
+library(directlabels)
+library(ggrepel)
+library(showtext)
+library(hrbrthemes)
+library(ggalt)
+library(remotes)
+
+
+
+
+
+```
+
+
+
+```{r}
+
+#Roboto Font
+font_add_google(name = "Roboto", family = "roboto")
+showtext_auto()
+
+
+```
+
+
+
+
+```{r}
+# define a bunch of colors that follow IDEA's definitions ####
+# basic pallette
+# teal, green, magenta, yellow, indigo, orange
+idea_colours <- c("#20B6E8","#8CCAAE","#E62D5F","#FFDD00","#43358B","#EB6209", "#336A97")
+
+# democratic performance colors
+# green, green, green, blue, orange
+demperf_colours <- c("#8CCAAE","#a3d4be","#badfce","#336A97","#EB6209")
+
+# regime classification colours
+# basic version of the demperf colours
+regime_colours <- demperf_colours[c(1,4,5)]
+
+# colors for showing indicator performance levels
+traffic_colours <- idea_colours[c(2,4,3)]
+
+# colors for advancers and decliners
+adv_decl_colours <- c("#890A3E", "#004587")
+
+```
+
+
+
+
+
+```{r}
+
+indices <- read_csv("GSODI Long v5 (1975-2020).csv")
+
+```
+
+```{r}
+#read in the first list, those that survived breakdown
+sb <- read_csv("survived_breakdown_years.csv")
+
+sb
+
+br_plots <- vector('list', ncol(sb))
+```
+
+
+
+```{r}
+#1.Create folder of graphs for those that recovered from breakdown
+#black dotted lines are beginning and end of breakdown
+
+for (country in sb$ID_country_name) {
+  
+  
+  
+  
+y1 <- sb$min_year[sb$ID_country_name == country]
+
+
+y2 <- sb$max_year[sb$ID_country_name == country]
+
+
+  
+data <- subset(indices, ID_country_name == country & ID_year >= (y1-2)  & ID_year <= (y2+2))
+
+
+data <- subset(data,ID_variable_name == "Clean Elections" | ID_variable_name =="Civil Liberties" | ID_variable_name == "Judicial Independence" | ID_variable_name == "Effective Parliament" | ID_variable_name == "Media Integrity")
+
+data <- data %>% group_by(ID_variable_name, ID_year) %>% summarise(mean_val = mean(value), mean_upper = mean(upper_value), mean_lower = mean(lower_value))
+
+breaks = y2-y1 + 4
+
+g <- ggplot(data, aes(x = ID_year, y = mean_val, group = ID_variable_name, color = ID_variable_name)) + geom_line(size = 2)  + ylim(0,1) +  scale_x_continuous(breaks = scales::pretty_breaks(breaks))  +scale_fill_manual(values= idea_colours) + theme_minimal() + # remove chart junk
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.ticks = element_line(), legend.position="bottom")  + # remove the legend if there is only one indicator being plotted
+  labs(x = "", y = "Indicator value", title = "Key indicator values during breakdown", subtitle = country,# axis labels NB add a title if necessary
+       caption = "Source: International IDEA, The Global State of Democracy Indices, 1975-2020", color = "Indicator") +
+  geom_label_repel(data = data %>% filter(ID_year %in% c(y1,y2)), size = 4, 
+                   show.legend = FALSE, point.padding	= .25, min.segment.length = 0, 
+                   aes(label =round(mean_val, digits = 2)))  + theme(legend.title = element_blank()) + geom_vline(xintercept = y1, linetype="dotted", 
+                color = "black", size=1.5)  + theme(legend.title = element_blank())  + theme(legend.title = element_blank())  + geom_vline(xintercept = y2, linetype="dotted", 
+                color = "black", size=1.5) +  geom_text(x=y1, label="Breakdown", y=.25, colour="black", angle=90, text=element_text(size=11), vjust = 1.5)  +
+  geom_text(x=y2 ,label ="Recovery", y=.25, colour="black", angle=90, text=element_text(size=11), vjust = 1.5)
+
+
+
+
+br_plots[[country]] <- g
+
+
+
+}
+br_plots[["Nigeria"]]
+
+
+```
+
+```{r}
+#save to pdf
+
+for (country in sb$ID_country_name) {
+  print(country)
+  
+      name  =paste(country, ".pdf", sep = "")
+      
+     ggsave(name , plot =br_plots[[country]] , device = "pdf")
+      
+      # Zip them up
+    
+
+     
+}
+
+ zip("breakdown_recovered.zip", c( 'Bolivia.pdf', 'Georgia.pdf', 'Guinea-Bissau.pdf', 'Nigeria.pdf', 'Kenya.pdf', 'Madagascar.pdf', 'Sri Lanka.pdf', 'Nepal.pdf', 'Fiji.pdf'))
+```
+
+```{r}
+#read in the second list, those still backsliding in 2020
+cb <- read_csv("2020_backsliders_years.csv")
+cb
+
+
+```
+
+
+```{r}
+
+#2. Create graphs for current backsliders
+#black dotted line is beginning of breakdown
+cb_plots <- vector('list', ncol(cb))
+
+for (country in cb$ID_country_name) {
+  
+  
+  
+  
+y1 <- cb$min_year[cb$ID_country_name == country]
+
+
+y2 <- cb$max_year[cb$ID_country_name == country]
+
+
+  
+data <- subset(indices, ID_country_name == country & ID_year >= y1 -2)
+
+
+
+data <- subset(data,ID_variable_name == "Clean Elections" | ID_variable_name =="Civil Liberties" | ID_variable_name == "Judicial Independence" | ID_variable_name == "Effective Parliament" | ID_variable_name == "Media Integrity")
+
+
+data <- data %>% group_by(ID_variable_name, ID_year) %>% summarise(mean_val = mean(value), mean_upper = mean(upper_value), mean_lower = mean(lower_value))
+
+breaks = y2-y1 + 4
+
+g <- ggplot(data, aes(x = ID_year, y = mean_val, group = ID_variable_name, color = ID_variable_name)) + geom_line(size = 2)  + ylim(0,1) +  scale_x_continuous(breaks = scales::pretty_breaks(breaks)) + geom_ribbon(aes(ymin=mean_lower, ymax=mean_upper, fill = ID_variable_name), show.legend = FALSE, linetype = 0, alpha = 0.1) +scale_fill_manual(values= idea_colours) + theme_minimal() + # remove chart junk
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.ticks = element_line(), legend.position="bottom")  + # remove the legend if there is only one indicator being plotted
+  labs(x = "", y = "Indicator value", title = "Key indicator values during backsliding", subtitle = country,# axis labels NB add a title if necessary
+       caption = "Source: International IDEA, The Global State of Democracy Indices, 1975-2020", color = "Indicator") +
+  geom_label_repel(data = data %>% filter(ID_year %in% c(y1,y2)), size = 4, 
+                   show.legend = FALSE, point.padding	= .25, min.segment.length = 0, 
+                   aes(label =round(mean_val, digits = 2)))  + theme(legend.title = element_blank()) + geom_vline(xintercept = y1, linetype="dotted", 
+                color = "black", size=1.5)  + theme(legend.title = element_blank()) +
+  geom_text(x=y1 ,label ="Backslide", y=.25, colour="black", angle=90, text=element_text(size=12), vjust = 1.5) 
+
+
+
+
+
+cb_plots[[country]] <- g
+
+
+
+}
+cb_plots[["Poland"]]
+
+```
+
+```{r}
+
+
+#save to pdf
+
+
+for (country in cb$ID_country_name) {
+  print(country)
+      name  =paste(country, ".pdf", sep = "")
+      
+     ggsave(name , plot =cb_plots[[country]] , device = "pdf")
+      
+      # Zip them up
+     # zip( file, c( 'norm_hist.png', 'unif_hist.png'))
+
+     
+    }
+
+
+ zip("currently_backsliding.zip", c( 'United States.pdf', 'Slovenia.pdf', 'Poland.pdf', 'Philippines.pdf', 'India.pdf', 'Hungary.pdf', 'Brazil.pdf'))
+```
+
+
+
+
+```{r}
+#read in 3rd list, those that broke down and did not recover
+brc <- read_csv("broken_years.csv")
+
+
+#some countries did not have a year in the past in which they transitioned to democracy, their "last_dem_year" is -inf, so replace with 2000
+brc$last_dem_year[!is.finite(brc$last_dem_year)] = 2000
+brc
+```
+
+
+```{r}
+#3. Create graphs for countries that broke down without recovering
+#black dotted line is last time country was democracy and when they broke down
+brc_plots <- vector('list', ncol(brc))
+
+for (country in brc$ID_country_name) {
+  
+
+  
+
+y1 <- brc$last_dem_year[brc$ID_country_name == country] 
+
+
+
+y2 <- brc$not_dem_year[brc$ID_country_name == country]
+
+
+  
+data <- subset(indices, ID_country_name == country & ID_year >= y1 -2 & ID_year <= y2 + 2)
+
+
+data <- subset(data,ID_variable_name == "Clean Elections" | ID_variable_name =="Civil Liberties" | ID_variable_name == "Judicial Independence" | ID_variable_name == "Effective Parliament" | ID_variable_name == "Media Integrity")
+
+
+data <- data %>% group_by(ID_variable_name, ID_year) %>% summarise(mean_val = mean(value), mean_upper = mean(upper_value), mean_lower = mean(lower_value))
+
+breaks = y2-y1 + 4
+
+if (breaks > 20) {
+  breaks = 20
+}
+
+
+g <- ggplot(data, aes(x = ID_year, y = mean_val, group = ID_variable_name, color = ID_variable_name)) + geom_line(size = 2)  + ylim(0,1) + scale_x_continuous(breaks = scales::pretty_breaks(breaks)) + geom_ribbon(aes(ymin=mean_lower, ymax=mean_upper, fill = ID_variable_name), show.legend = FALSE, linetype = 0, alpha = 0.1) +scale_fill_manual(values= idea_colours) + theme_minimal() + # remove chart junk
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.ticks = element_line(), legend.position="bottom")  + # remove the legend if there is only one indicator being plotted
+  labs(x = "", y = "Indicator value", title = "Key indicator values during breakdown", subtitle = country,# axis labels NB add a title if necessary
+       caption = "Source: International IDEA, The Global State of Democracy Indices, 1975-2020", color = "Indicator") +
+  geom_label_repel(data = data %>% filter(ID_year %in% c(y1, y2)), size = 4, 
+                   show.legend = FALSE, point.padding	= .25, min.segment.length = 0, 
+                   aes(label =round(mean_val, digits = 2)))  + theme(legend.title = element_blank()) + geom_vline(xintercept = y2, linetype="dotted", 
+                color = "black", size=1.5)  + theme(legend.title = element_blank())  + theme(legend.title = element_blank())  + theme(legend.title = element_blank()) + geom_vline(xintercept = y1, linetype="dotted", 
+                color = "black", size=1.5)  +  geom_text(x=y1, label="Democracy", y=.25, colour="black", angle=90, text=element_text(size=11), vjust = 1.5)  +
+  geom_text(x=y2 ,label ="Breakdown", y=.25, colour="black", angle=90, text=element_text(size=11), vjust = 1.5)
+
+
+
+
+brc_plots[[country]] <- g
+
+
+
+}
+
+
+brc_plots[["Zambia"]]
+
+```
+```{r}
+#save to pdf
+
+dim(brc)
+for (country in brc$ID_country_name) {
+  print(country)
+      name  =paste(country, ".pdf", sep = "")
+      
+     ggsave(name , plot =brc_plots[[country]] , device = "pdf")
+      
+    
+
+     
+}
+
+
+
+ zip("breakdown_no_recovery.zip", c( 'Haiti.pdf', 'Honduras.pdf', 'Nicaragua.pdf', 'Venezuela.pdf', 'Serbia.pdf', 'Russia.pdf', 'Mali.pdf', 'Benin.pdf', 'Niger.pdf', "Cote d'Ivoire.pdf", 'Central African Republic.pdf', 'Burundi.pdf', 'Mozambique.pdf', 'Zambia.pdf',
+                                     'Libya.pdf', 'Turkey.pdf', 'Bangladesh.pdf', 'Thailand.pdf'
+                                     ))
+
+```
+```{r}
+#read in 4th list, those that survived backsling
+survived <- read_csv("survived_backsliding.csv")
+
+survived
+```
+
+
+
+
+```{r}
+#4. Create graphs for those that survived backsliding
+#black dotted lines are beginning and end of backsliding
+surv_plots <- vector('list', ncol(survived))
+for (country in survived$ID_country_name) {
+  
+  
+
+
+  
+y1 <- survived$first_year[survived$ID_country_name == country]
+
+
+y2 <- survived$ID_year[survived$ID_country_name == country]
+
+  
+
+
+  
+data <- subset(indices, ID_country_name == country & ID_year >= y1 -2 )
+
+
+data <- subset(data,ID_variable_name == "Clean Elections" | ID_variable_name =="Civil Liberties" | ID_variable_name == "Judicial Independence" | ID_variable_name == "Effective Parliament" | ID_variable_name == "Media Integrity")
+
+data <- data %>% group_by(ID_variable_name, ID_year) %>% summarise(mean_val = mean(value), mean_upper = mean(upper_value), mean_lower = mean(lower_value))
+
+
+g <- ggplot(data, aes(x = ID_year, y = mean_val, group = ID_variable_name, color = ID_variable_name)) + geom_line(size = 2)  + ylim(0,1) +  scale_x_continuous(breaks = scales::pretty_breaks(2020-y1+2)) + geom_ribbon(aes(ymin=mean_lower, ymax=mean_upper, fill = ID_variable_name), show.legend = FALSE, linetype = 0, alpha = 0.1) +scale_fill_manual(values= idea_colours) + theme_minimal() +  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.ticks = element_line(), legend.position="bottom")  + # remove the legend if there is only one indicator being plotted
+  labs(x = "", y = "Indicator value", title = "Key indicator values during backsliding", subtitle = country,# axis labels NB add a title if necessary
+       caption = "Source: International IDEA, The Global State of Democracy Indices, 1975-2020", color = "Indicator") +
+  geom_label_repel(data = data %>% filter(ID_year %in% c(y1, y2)), size = 4, 
+                   show.legend = FALSE, point.padding	= .25, min.segment.length = 0, 
+                   aes(label =round(mean_val, digits = 2)))  + theme(legend.title = element_blank()) + geom_vline(xintercept = y2, linetype="dotted", 
+                color = "black", size=1.5)  +  theme(legend.title = element_blank()) + geom_vline(xintercept = y1, linetype="dotted", 
+                color = "black", size=1.5) + theme(legend.title = element_blank())  + theme(legend.title = element_blank())   +  geom_text(x=survived$first_year[survived$ID_country_name == country], label="Backsliding", y=.25, colour="black", angle=90, text=element_text(size=11), vjust = 1.5)  +
+  geom_text(x=survived$ID_year[survived$ID_country_name == country], label="End of Backsliding", y=.25, colour="black", angle=90, text=element_text(size=11), vjust = 1.5)
+
+
+
+
+surv_plots[[country]] <- g 
+
+
+}
+
+
+surv_plots[["Ukraine"]]
+```
+
+```{r}
+#save to pdf
+
+for (country in survived$ID_country_name) {
+  
+      name  =paste(country, ".pdf", sep = "")
+      
+     ggsave(name , plot =surv_plots[[country]] , device = "pdf")
+     
+     surv_plots[[country]]
+
+      
+      
+     
+}
+
+
+
+ zip("backslide_recovery.zip", c( 'Romania.pdf', 'North Macedonia.pdf', 'Ukraine.pdf'))
+
+```
+```{r}
+surv_plots[["Romania"]]
+surv_plots[["Ukraine"]]
+surv_plots[["North Macedonia"]]
+```
