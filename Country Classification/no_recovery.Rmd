@@ -1,0 +1,130 @@
+```{r}
+#read in data
+library(tidyverse)
+
+gsodi_long <-read_csv("GSODI Long v5 (1975-2020).csv") %>% 
+  filter(!is.na(perform_class_var),
+         !is.na(ID_variable_name),
+         ID_country_region_sub == 1)
+```
+
+
+
+
+```{r}
+#define countries that are still democracies
+current_dem <- read_excel("backslide_sheet.xlsx")
+
+current_dem  <- subset(current_dem, ID_year == 2020)
+
+current_dem  <- subset(current_dem, regime_status_name == "Democracy")
+
+current_dem <- current_dem %>% select(ID_country_name, ID_year, regime_status_name)
+
+```
+
+```{r}
+## Open GSOD v5, clean it
+
+
+GSODI_backsliding_df = read_excel("backslide_sheet.xlsx")
+
+ 
+
+## Tidy the df (long to wide)
+
+GSODI_backsliding_abbrev_df = GSODI_backsliding_df[, c(1,2,4)] ## Isolate year, country name, regime type
+
+GSODI_backsliding_abbrev_df = subset(GSODI_backsliding_abbrev_df, ID_year > 1999)
+
+GSODI_backsliding_abbrev_flagged_df = GSODI_backsliding_abbrev_df %>%
+
+  group_by(ID_country_name) %>%
+
+  mutate(dem_flag = ifelse(regime_status_name == "Democracy", 1, 0),
+
+         ever_dem = max(dem_flag),
+
+         hybrid_flag = ifelse(regime_status_name == "Hybrid Regime", 1, 0),
+
+         ever_hybrid = max(hybrid_flag),
+
+         auth_flag = ifelse(regime_status_name == "Authoritarian Regime", 1, 0),
+
+        ever_auth = max(auth_flag)) %>%
+
+  filter(ID_year == 2020)
+
+ 
+
+GSODI_backsliding_filtered_df = GSODI_backsliding_abbrev_flagged_df %>%
+
+  filter(ever_dem == 1 & (hybrid_flag == 1 | auth_flag == 1))
+
+ 
+
+breakdown_list = unique(GSODI_backsliding_filtered_df$ID_country_name)
+
+breakdown_list = as.data.frame(breakdown_list)
+
+write_csv(breakdown_list, "breakdown.csv")
+
+breakdown_list
+
+```
+
+
+
+
+
+
+
+```{r}
+
+
+
+#2. Define list of countries that did not maintain democracy post backsliding
+
+backslide_failed <- read_excel("backslide_sheet.xlsx")
+
+
+backslide_failed<- backslide_failed %>% select(ID_country_name, ID_year, backslide, regime_status_name)
+
+backslide_failed <- subset(backslide_failed, backslide == "backsliding")
+
+backslide_failed  <- subset(backslide_failed, ID_year >= 2000)
+
+
+
+#define columns of last year of backsliding, as well as the year after that
+backslide_failed <- backslide_failed %>% group_by(ID_country_name) %>% mutate(last_year_of_backslide = max(ID_year)) %>% ungroup
+
+backslide_failed <- backslide_failed %>% group_by(ID_country_name) %>% mutate(first_year_of_backslide = min(ID_year)) %>% ungroup
+
+backslide_failed$next_year <- (backslide_failed$last_year_of_backslide) + 1
+
+backslide_failed <- distinct(backslide_failed, ID_country_name, last_year_of_backslide, first_year_of_backslide, next_year, regime_status_name)
+
+backslide_failed <- select(backslide_failed, ID_country_name, last_year_of_backslide, first_year_of_backslide, next_year)
+
+
+backslide_failed 
+
+```
+
+
+```{r}
+#Only include countries whose next_year is 2021, i.e. still backsliding
+
+
+backslide_dem <- subset(backslide_failed, next_year == 2021)
+backslide_dem <- subset(backslide_dem, select = -c(next_year, last_year_of_backslide))
+backslide_dem
+
+write_csv(backslide_dem, "backslide.csv")
+
+
+```
+
+
+

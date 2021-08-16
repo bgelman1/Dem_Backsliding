@@ -1,0 +1,217 @@
+
+```{r}
+#read in data
+library(tidyverse)
+
+gsodi_long <-read_csv("GSODI Long v5 (1975-2020).csv") %>% 
+  filter(!is.na(perform_class_var),
+         !is.na(ID_variable_name),
+         ID_country_region_sub == 1)
+```
+
+
+```{r}
+#1.Define list of countries that recovered from backsliding
+
+
+#read in data, filter for countries that backslid
+
+backslide <- read_excel("backslide_sheet.xlsx")
+
+
+backslide <- backslide %>% select(ID_country_name, ID_year, backslide, regime_status_name)
+
+backslide <- subset(backslide, backslide == "backsliding")
+
+backslide  <- subset(backslide, ID_year >= 2000)
+
+
+
+#define columns of last year of backsliding, as well as the year after that
+backslide <- backslide %>% group_by(ID_country_name) %>% mutate(last_year = max(ID_year)) %>% ungroup
+
+backslide <- backslide %>% group_by(ID_country_name) %>% mutate(first_year = min(ID_year)) %>% ungroup
+
+backslide$next_year <- (backslide$last_year) + 1
+
+backslide <- distinct(backslide, ID_country_name, last_year, first_year, next_year, regime_status_name)
+
+backslide
+```
+
+
+
+
+```{r}
+#define countries that are still democracies
+current_dem <- read_excel("backslide_sheet.xlsx")
+
+current_dem  <- subset(current_dem, ID_year == 2020)
+
+current_dem  <- subset(current_dem, regime_status_name == "Democracy")
+
+current_dem <- current_dem %>% select(ID_country_name, ID_year, regime_status_name)
+
+```
+
+```{r}
+#filter out non-democracies
+
+current_temp <- subset(current_dem, ID_country_name %in% backslide$ID_country_name)
+
+backslide <- subset(backslide, ID_country_name %in% current_temp$ID_country_name)
+
+backslide
+```
+```{r}
+
+#fikter out countries whose next year is 2021, i.e. those that are still backsliding
+backslide <- subset(backslide, next_year != 2021)
+
+
+
+#filter out countries that were not democracies when their backsliding ended
+backslide$keep = 1
+
+
+backslide_data <- read_excel("backslide_sheet.xlsx")
+
+for (country in backslide$ID_country_name) {
+  year = backslide$next_year[backslide$ID_country_name == country]
+  state = backslide_data$democratic_performance_name[backslide_data$ID_year == year & backslide_data$ID_country_name == country]
+  if (state == "Hybrid Regime" | state == "Authoritarian Regime") {
+    backslide$keep[backslide$ID_country_name == country] = 0
+  }
+  
+  
+}
+
+backslide <- subset(backslide, keep != 0)
+
+backslide <- select(backslide, ID_country_name, first_year)
+
+backslide
+
+write_csv(backslide, "backsliding_recovery.csv")
+
+
+```
+
+
+```{r}
+#2. Define list of countries that recovered from democratic breakdown
+### regime distinct, select relevant variables from gsodi_long and collapse to a regime dataset
+
+relevant_variables <- c("ID_country_code", "ID_country_name",
+                        "ID_year", "ID_country_year", "ID_region", 
+                        "ID_subregion", "ID_region_name", "ID_subregion_name", 
+                        "regime_status", "regime_status_name",
+                        "democratic_performance_name",
+                        "regime_change_class_1_year",
+                        "regime_status_change_1_year",
+                        "dem_transition_1_year",
+                        "dem_breakdown_1_year",
+                        "regime_change_class_1_year")
+
+
+regime_status_wide <- gsodi_long %>%  
+  select(relevant_variables) %>%
+  distinct() %>%
+  mutate(regime_status_name  = factor(regime_status_name, levels = c("Democracy",
+                                                                     "Hybrid Regime",
+                                                                     "Authoritarian Regime")),
+         democratic_performance_name = factor(democratic_performance_name, levels = c("High performing democracy", 
+                                                                                      "Mid-range performing democracy", 
+                                                                                      "Weak democracy",
+                                                                                      "Hybrid Regime",
+                                                                                      "Authoritarian Regime")))
+```
+
+
+
+
+```{r}
+
+### Filter the regime_status dataset to only include the last 20 years
+
+regime_status_wide_2000_2020 <- filter(regime_status_wide, ID_year %in% 2000:2020)
+
+### Create a new variable that includes total dem_transitions and dem_breakdowns
+
+democratization_change_df <- regime_status_wide_2000_2020 %>% 
+  group_by(ID_country_name) %>% 
+  mutate(sum_dem_trans = sum(dem_transition_1_year, na.rm = TRUE),
+         sum_dem_interupt = sum(dem_breakdown_1_year, na.rm = TRUE))
+
+
+democratization_change_df
+
+```
+
+
+
+
+
+
+```{r}
+#filter for countries that have undergone transitions since 2000
+
+breaks <- subset(democratization_change_df, sum_dem_trans > 0 & sum_dem_interupt > 0 & regime_status_change_1_year != 0)
+
+breaks <- distinct(breaks, ID_country_name, regime_status_name, ID_year, regime_status_change_1_year)
+
+
+
+```
+
+
+```{r}
+#filter out countries that are no longer democracies
+current_temp <- subset(current_dem, ID_country_name %in% breaks$ID_country_name)
+
+breaks <- subset(breaks, ID_country_name %in% current_temp$ID_country_name)
+
+```
+
+
+
+
+```{r}
+
+
+
+#filter out rows that represent a transition to democracy before any of the decline, we want to start at the decline
+
+
+breaks <- breaks %>% group_by(ID_country_name) %>% mutate(first_regime = first(regime_status_name), first_year = min(ID_year)) %>% ungroup()
+breaks$keep = 1
+
+
+
+for (row in 1:nrow(breaks)) {
+  if ((breaks$first_regime[row] == "Democracy") & (breaks$ID_year[row] == breaks$first_year[row]) ){
+    breaks$keep[row] = 0
+  }
+  
+}
+
+breaks <- subset(breaks, keep == 1)
+
+print(unique(breaks$ID_country_name))
+
+
+```
+
+
+
+```{r}
+#remove unnecessary columns
+breaks = subset(breaks, select = -c(first_regime, first_year, keep) )
+
+breaks <- unique(breaks$ID_country_name)
+breaks <- as.data.frame(breaks)
+write_csv(breaks, "breakdown_recovery.csv")
+
+
+```
+
