@@ -14,5 +14,11 @@ Thesse csvs are used for analysis in the other folders. More detailed descriptio
 
 Part B: Attribute Research
 
+In the attribute_research.Rmd code in the "Attribute Research" folder, I find the most common advancing/declining democratic attributes in each of these groups during their respective periods of decline/recovery. These findings are then graphed in the pdfs.
+
+
+Part C: Graph Generation
+
+In the final part of the project, I wrote a script, automated_graphs.Rmd, that generates graphs of specific attributes for each of the countries on all 4 lists. 
 
 
