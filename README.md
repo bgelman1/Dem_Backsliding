@@ -10,7 +10,7 @@ The "Country Classification" folder contains code (no_recovery.rmd, recovery.rmd
 3. Countries that backslid and recovered (backsliding_recovery.csv).
 4. Countries that broke down and recovered (breakdown_recovery.csv).
 
-Thesse csvs are used for analysis in the other folders. More detailed descriptions of these categories can be found in Country List.docx.
+These csvs are used for analysis in the other folders. More detailed descriptions of these categories can be found in Country List.docx.
 
 Part B: Attribute Research
 
